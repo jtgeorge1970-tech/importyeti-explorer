@@ -4,6 +4,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const BASE_URL = process.env.IMPORTYETI_API_BASE_URL || 'https://data.importyeti.com';
+const TARGET_SUPPLIER_COUNTRIES = [
+  'China','India','Vietnam','Taiwan','Bangladesh','Sri Lanka','Indonesia','Malaysia','Thailand','Philippines','Pakistan','Cambodia','South Korea','Japan','Switzerland','South Africa','United Kingdom','Algeria','Iraq','Serbia','Laos','Myanmar','Brunei','Kazakhstan','Tunisia','Nicaragua','New Zealand','Norway','Israel','Turkey'
+];
 
 function apiKey() {
   return process.env.IMPORTYETI_API_KEY || process.env.BTA_SERVICE_API_KEY;
@@ -36,11 +39,15 @@ export async function GET(request) {
     if (name === 'search') base.searchParams.append('query', value); else base.searchParams.append(name, value);
   }
 
+  // COST GUARD: apply filters inside ImportYeti BEFORE records consume our downstream attention/enrichment.
+  // These two filters are broad and loss-averse: tariff-relevant foreign sourcing + meaningful importer activity.
+  // Product/HS/industry fit remains a second-stage BTA screen because over-narrow keyword filters can hide good leads.
+  if (!base.searchParams.has('supplier_country')) base.searchParams.set('supplier_country', TARGET_SUPPLIER_COUNTRIES.join(' | '));
+  if (!base.searchParams.has('company_total_shipments')) base.searchParams.set('company_total_shipments', '25 TO *');
+
   try {
     const combined = [], seen = new Set();
     let creditsRemaining = null, requestCost = 0, totalCompanies = null, lastStatus = 200;
-    // ImportYeti's companies endpoint currently caps each response at 10 even when a larger limit is requested.
-    // Walk pages until the requested number of distinct companies is collected.
     for (let page = 1; page <= Math.ceil(wanted / 10) + 2 && combined.length < wanted; page++) {
       const upstream = new URL(base);
       upstream.searchParams.set('limit', '10');
@@ -62,7 +69,20 @@ export async function GET(request) {
       }
       if (!added) break;
     }
-    return NextResponse.json({ ok: true, status: lastStatus, source: 'importyeti', data: { requestCost, creditsRemaining, data: { data: combined.slice(0, wanted), totalCompanies }, batch: { requested: wanted, returned: Math.min(wanted, combined.length), distinct: seen.size } } }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({
+      ok: true, status: lastStatus, source: 'importyeti',
+      data: {
+        requestCost, creditsRemaining,
+        data: { data: combined.slice(0, wanted), totalCompanies },
+        batch: { requested: wanted, returned: Math.min(wanted, combined.length), distinct: seen.size },
+        upstreamScreen: {
+          appliedBeforeRetrieval: true,
+          supplierCountries: TARGET_SUPPLIER_COUNTRIES,
+          minimumCompanyShipments: 25,
+          note: 'Broad upstream cost guard. Product/HS/industry and logistics exclusions are evaluated by the BTA screen after retrieval to avoid false negatives.'
+        }
+      }
+    }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: 'ImportYeti request failed.', detail: error.message }, { status: 502 });
   }
