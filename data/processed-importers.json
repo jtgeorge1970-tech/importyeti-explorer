@@ -1,5 +1,16 @@
 {
   "version": 1,
   "description": "BTA permanent duplicate ledger. Every ImportYeti company already retrieved/paid for belongs here, including later rejects. Never delete IDs just because a lead is rejected.",
-  "processed": {}
+  "processed": {
+    "/company/wind-turbine-and-energy-cables": {"source":"historical-test","status":"processed"},
+    "/company/soytile-usa": {"source":"historical-test","status":"processed"},
+    "/company/sinai-marble-stone": {"source":"historical-test","status":"processed"},
+    "/company/pyramids-tile-and-stone": {"source":"historical-test","status":"processed"},
+    "/company/valero-marketing-and-supply": {"source":"historical-test","status":"processed"},
+    "/company/trebor": {"source":"historical-test","status":"processed"},
+    "/company/yara-north-america": {"source":"historical-test","status":"processed"},
+    "/company/hm-southeast-cement": {"source":"historical-test","status":"processed"},
+    "/company/ril-usa": {"source":"historical-test","status":"processed"},
+    "/company/two-rivers-terminal": {"source":"historical-test","status":"processed"}
+  }
 }
